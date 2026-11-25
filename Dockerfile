@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1
+
+# ---- 1. PHP dependencies (no dev packages) ----
+FROM composer:2 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction --ignore-platform-reqs
+COPY . .
+RUN composer dump-autoload --no-dev --optimize --no-interaction --ignore-platform-reqs
+
+# ---- 2. Frontend assets (Vite) ----
+FROM node:22-alpine AS assets
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY resources ./resources
+COPY vite.config.js ./
+COPY public ./public
+RUN npm run build
+
+# ---- 3. Runtime: FrankenPHP (Caddy + PHP in one binary, no nginx/php-fpm to configure) ----
+FROM dunglas/frankenphp:1-php8.4-alpine AS runtime
+
+RUN install-php-extensions pdo_pgsql opcache bcmath pcntl \
+    && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+WORKDIR /app
+COPY --from=vendor /app /app
+COPY --from=assets /app/public/build /app/public/build
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint
+RUN chmod +x /usr/local/bin/entrypoint
+
+ARG APP_VERSION=dev
+ENV APP_NAME=EventPass \
+    APP_ENV=production \
+    APP_DEBUG=false \
+    LOG_CHANNEL=stderr \
+    APP_VERSION=${APP_VERSION}
+
+# Run as a non-root user.
+RUN addgroup -S app && adduser -S -G app app \
+    && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && chown -R app:app /app/storage /app/bootstrap/cache /data /config
+USER app
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget -qO- "http://127.0.0.1:${PORT:-8080}/up" >/dev/null || exit 1
+
+ENTRYPOINT ["entrypoint"]
+CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

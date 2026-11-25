@@ -1,0 +1,35 @@
+# Render Blueprint: one free Docker web service. Database lives on Neon (free Postgres).
+services:
+  - type: web
+    name: eventpass
+    runtime: docker
+    plan: free
+    autoDeployTrigger: commit
+    healthCheckPath: /health
+    envVars:
+      - key: APP_NAME
+        value: EventPass
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false # generate with: docker run --rm composer:2 php -r "echo 'base64:'.base64_encode(random_bytes(32));"
+      - key: APP_URL
+        sync: false # e.g. https://eventpass.onrender.com
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        sync: false # Neon connection string
+      - key: DB_SSLMODE
+        value: require
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: RUN_MIGRATIONS
+        value: "true"
