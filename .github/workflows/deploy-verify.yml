@@ -1,13 +1,14 @@
-name: Verify deployment
+name: Release watch
 
-# Render deploys a commit only after CI checks pass (autoDeployTrigger: checksPass).
-# This workflow runs after a successful CI on main and proves the new release is live:
-# it polls /health until the reported version equals the commit SHA.
+# Render deploys a commit only after ALL GitHub checks on it pass (autoDeployTrigger: checksPass).
+# A workflow that waited for the deploy would therefore deadlock with Render (it would be a check
+# that Render waits on, while it waits on Render). So verification is a short, non-blocking watcher:
+# it runs on a schedule (and on demand), checks the live site, and compares the live version with
+# main. It fails only if the site is unhealthy, or main has not been released after 30 minutes.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,28 +17,33 @@ env:
   SITE_URL: https://eventpass-36j5.onrender.com
 
 jobs:
-  verify:
-    name: Wait for release and check health
-    if: github.event.workflow_run.conclusion == 'success'
+  watch:
+    name: Check live release
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
-      - name: Poll /health for the new version
-        env:
-          SHA: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/checkout@v4
+
+      - name: Health and version
         run: |
-          echo "Waiting for $SITE_URL to serve $SHA"
-          for i in $(seq 1 60); do
-            body=$(curl -fsS --max-time 60 "$SITE_URL/health" || true)
-            echo "[$i] $body"
-            if echo "$body" | grep -q "\"version\":\"$SHA\"" && echo "$body" | grep -q '"status":"ok"'; then
-              echo "Release $SHA is live and healthy."
-              exit 0
-            fi
-            sleep 20
-          done
-          echo "::error::Release $SHA did not become healthy in time. Render keeps the previous version serving if a deploy fails its health check; roll back from the Render dashboard if needed."
-          exit 1
+          # The free instance sleeps when idle; the first request may take about a minute to wake it.
+          body=$(curl -fsS --retry 3 --retry-delay 10 --max-time 90 "$SITE_URL/health") || {
+            echo "::error::Live site did not answer /health"; exit 1; }
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"' || { echo "::error::Site is reporting a degraded status"; exit 1; }
+
+          live=$(echo "$body" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+          head="$(git rev-parse HEAD)"
+          age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
+
+          if [ "$live" = "$head" ]; then
+            echo "Release $head is live and healthy."
+          elif [ "$age" -lt 1800 ]; then
+            echo "::notice::Live is on ${live:0:7}; main (${head:0:7}) is only $((age / 60)) min old, so a deploy is probably still in progress."
+          else
+            echo "::error::main (${head:0:7}) is $((age / 60)) min old but live is still ${live:0:7}. The deploy failed or was skipped; check Render."
+            exit 1
+          fi
 
       - name: Smoke test key pages
         run: |

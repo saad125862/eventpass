@@ -1,7 +1,7 @@
 # EventPass
 
 [![CI](https://github.com/saad125862/eventpass/actions/workflows/ci.yml/badge.svg)](https://github.com/saad125862/eventpass/actions/workflows/ci.yml)
-[![Verify deployment](https://github.com/saad125862/eventpass/actions/workflows/deploy-verify.yml/badge.svg)](https://github.com/saad125862/eventpass/actions/workflows/deploy-verify.yml)
+[![Release watch](https://github.com/saad125862/eventpass/actions/workflows/deploy-verify.yml/badge.svg)](https://github.com/saad125862/eventpass/actions/workflows/deploy-verify.yml)
 ![Laravel 13](https://img.shields.io/badge/Laravel-13-ff2d20?logo=laravel&logoColor=white)
 ![PHP 8.4](https://img.shields.io/badge/PHP-8.4-777bb4?logo=php&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ed?logo=docker&logoColor=white)
@@ -60,7 +60,7 @@ push / PR
   └─ publish      immutable :sha + :latest image to GHCR            (main only)
 
 Render deploys the commit ONLY after the checks above pass (autoDeployTrigger: checksPass)
-  └─ deploy-verify  polls /health until the live version == the commit SHA, then smoke-tests pages
+  └─ release-watch  (every 15 min, non-blocking) health + smoke tests, and fails if main is not live after 30 min
 ```
 
 - **Zero-downtime and safe:** Render keeps the previous release serving until the new one passes `/health`, and migrations run on boot of the new instance.

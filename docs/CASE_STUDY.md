@@ -13,7 +13,8 @@ EventPass is a Laravel 13 ticketing platform: attendees book seats and receive Q
 | "Works on my machine" | One multi-stage Dockerfile for CI and production; non-root user | CI smoke test runs the exact production image |
 | Render rejected the first deploy (`frankenphp: Operation not permitted`) | Reproduced locally with `docker run --cap-drop=ALL`, removed the binary's file capability | CI now smoke-tests with all capabilities dropped so it can never regress |
 | Deploying broken code | Render `autoDeployTrigger: checksPass` + health-check gating | Only green commits ship; failed releases never replace a healthy one |
-| "Did my deploy actually land?" | `/health` returns the commit SHA; a workflow polls until it matches | Each release is verified, not assumed |
+| "Did my deploy actually land?" | `/health` returns the commit SHA; a scheduled, non-blocking watcher compares it with `main` | A release that fails to land is flagged within 30 minutes |
+| Deploy never started: my "verify deployment" workflow was a check Render waited on while it waited on Render | Spotted the circular wait from the commit's check runs; moved verification to a scheduled watcher | Pipeline can no longer deadlock itself |
 
 ## Metrics to quote
 
