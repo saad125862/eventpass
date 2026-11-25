@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,7 +14,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Render terminates TLS in front of the container, so trust its proxy headers.
+        $middleware->trustProxies(at: '*');
+
+        // Payment provider callbacks are authenticated by an HMAC signature instead of a CSRF token.
+        $middleware->validateCsrfTokens(except: ['webhooks/*']);
+
+        $middleware->alias([
+            'role' => EnsureRole::class,
+        ]);
+
+        $middleware->web(append: [SecurityHeaders::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
