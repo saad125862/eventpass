@@ -13,6 +13,8 @@ storage/framework/sessions/*
 storage/framework/views/*
 database/*.sqlite
 tests
+mobile
+docs
 .phpunit.cache
 Dockerfile
 docker-compose*.yml

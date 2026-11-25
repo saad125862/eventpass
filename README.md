@@ -26,6 +26,27 @@ Payments run in **test mode**. Use card `4242 4242 4242 4242` (any future date a
 - **Organizers** create events with multiple ticket tiers, publish them, watch sales on a dashboard, export attendees as CSV, and **scan tickets at the door with a phone camera**.
 - **Admins** manage roles and moderate events.
 
+## Android app (Flutter)
+
+A companion app in [`mobile/`](mobile) talks to the same Laravel backend through a token API (Laravel Sanctum):
+
+- **Attendees:** browse events, see ticket types and availability, and keep QR tickets in a wallet.
+- **Organizers:** pick an event and scan tickets with the phone camera. It calls the same atomic one-scan check-in as the website, so the two can never disagree.
+- One-tap demo sign-in, the same brand theme, and friendly handling of the free server waking up.
+
+**Download the APK:** https://github.com/saad125862/eventpass/releases/latest/download/EventPass.apk
+(sideload it; it is signed with a debug key, not a Play Store key).
+
+```powershell
+cd mobile
+flutter pub get
+flutter run                                   # uses the live demo API
+flutter run --dart-define=API_BASE=http://10.0.2.2:8000   # or your local docker compose server
+flutter build apk --release
+```
+
+`mobile/android/gradle.properties` sets `kotlin.incremental=false`, which avoids Kotlin's "different roots" error when the project and the Pub cache are on different drives (for example `E:` and `C:` on Windows).
+
 ## The interesting engineering
 
 | Problem | Solution |
@@ -58,6 +79,7 @@ A single free Render container runs the web server, a queue worker (emails) and 
 push / PR
   ├─ quality      Pint · Larastan · composer audit · tests with a 80% coverage gate
   ├─ concurrency  full suite on a PostgreSQL service (50 racing buyers)
+  ├─ mobile       Flutter analyze + unit tests
   ├─ docker       build · Trivy scan · smoke test with ALL Linux capabilities dropped
   └─ publish      immutable :sha + :latest image to GHCR            (main only)
 
@@ -98,7 +120,7 @@ docker compose run --rm -e DB_DATABASE=eventpass_test app php artisan test
 
 ## Stack
 
-Laravel 13 · PHP 8.4 · PostgreSQL 17 · Tailwind CSS 4 · Alpine.js · Motion · FrankenPHP · Docker · GitHub Actions · Render · Neon · bacon-qr-code · dompdf
+Laravel 13 · PHP 8.4 · PostgreSQL 17 · Tailwind CSS 4 · Alpine.js · Motion · Laravel Sanctum · Flutter (Dart) · FrankenPHP · Docker · GitHub Actions · Render · Neon · bacon-qr-code · dompdf
 
 ## Project layout
 

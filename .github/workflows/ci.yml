@@ -102,6 +102,29 @@ jobs:
       - name: Full suite on PostgreSQL (50 racing buyers, 10 tickets)
         run: php artisan test
 
+  # ------------------------------------------------------------ Flutter mobile app
+  mobile:
+    name: Flutter app (analyze and test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Unit tests
+        run: flutter test
+
   # ------------------------------------------------------------- container build
   docker:
     name: Build image, scan, smoke test

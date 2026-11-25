@@ -16,6 +16,9 @@ EventPass is a Laravel 13 ticketing platform: attendees book seats and receive Q
 | "Did my deploy actually land?" | `/health` returns the commit SHA; a scheduled, non-blocking watcher compares it with `main` | A release that fails to land is flagged within 30 minutes |
 | Deploy never started: my "verify deployment" workflow was a check Render waited on while it waited on Render | Spotted the circular wait from the commit's check runs; moved verification to a scheduled watcher | Pipeline can no longer deadlock itself |
 
+| Mobile app needs the same rules as the website | Token API (Sanctum) that reuses the booking, ticket and check-in services; Flutter app on top | One source of truth: web and Android cannot disagree about a ticket |
+| Kotlin build failed across drives (project on `E:`, Pub cache on `C:`) | `kotlin.incremental=false` in `gradle.properties` | Reproducible release APK on a split-drive Windows machine |
+
 ## Metrics to quote
 
 - 45 automated tests (92% line coverage), run on both SQLite and PostgreSQL
