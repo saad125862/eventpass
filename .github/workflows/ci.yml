@@ -123,12 +123,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Vulnerability scan (Trivy, critical and fixable only)
-        uses: aquasecurity/trivy-action@v0.33.1
-        with:
-          image-ref: eventpass:ci
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
+        # Run Trivy from its official image: no installer step to break, and the version is pinned.
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.65.0 image --no-progress --severity CRITICAL --ignore-unfixed --exit-code 1 eventpass:ci
 
       - name: Smoke test (all Linux capabilities dropped, like Render)
         run: |
