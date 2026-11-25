@@ -22,7 +22,10 @@ RUN npm run build
 FROM dunglas/frankenphp:1-php8.4-alpine AS runtime
 
 RUN install-php-extensions pdo_pgsql opcache bcmath pcntl \
-    && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+    && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+    # We listen on an unprivileged port (>1024), so drop the binary's file capability.
+    # Without this, platforms that don't grant NET_BIND_SERVICE (e.g. Render) refuse to exec it.
+    && setcap -r /usr/local/bin/frankenphp
 
 WORKDIR /app
 COPY --from=vendor /app /app
