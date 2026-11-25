@@ -62,6 +62,37 @@ class AuthTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_demo_login_is_disabled_when_the_flag_is_off(): void
+    {
+        config(['eventpass.demo_login' => false]);
+        $this->user(attrs: ['email' => 'attendee@eventpass.test']);
+
+        $this->get('/login')->assertDontSee('Demo attendee');
+        $this->post('/login/demo/attendee')->assertNotFound();
+        $this->assertGuest();
+    }
+
+    public function test_demo_login_signs_in_attendee_and_organizer_but_never_admin(): void
+    {
+        config(['eventpass.demo_login' => true]);
+        $attendee = $this->user(attrs: ['email' => 'attendee@eventpass.test']);
+        $organizer = $this->user(Role::Organizer, ['email' => 'organizer@eventpass.test']);
+        $this->user(Role::Admin, ['email' => 'admin@eventpass.test']);
+
+        $this->get('/login')->assertSee('Demo attendee')->assertSee('Demo organizer');
+
+        $this->post('/login/demo/attendee')->assertRedirect(route('events.index'));
+        $this->assertAuthenticatedAs($attendee);
+        $this->post('/logout');
+
+        $this->post('/login/demo/organizer')->assertRedirect(route('organizer.dashboard'));
+        $this->assertAuthenticatedAs($organizer);
+        $this->post('/logout');
+
+        $this->post('/login/demo/admin')->assertNotFound();
+        $this->assertGuest();
+    }
+
     public function test_guests_are_sent_to_login_for_protected_pages(): void
     {
         foreach (['/tickets', '/organizer', '/admin'] as $path) {

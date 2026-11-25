@@ -36,6 +36,7 @@ Route::post('/webhooks/payments', PaymentWebhookController::class)->name('webhoo
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login.store');
+    Route::post('/login/demo/{role}', [AuthController::class, 'demo'])->middleware('throttle:20,1')->name('login.demo');
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1')->name('register.store');
 });

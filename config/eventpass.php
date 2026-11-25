@@ -43,6 +43,10 @@ return [
 
     'demo_password' => env('DEMO_PASSWORD', 'eventpass-demo'),
 
+    // Shows one-click "demo login" buttons (attendee and organizer only, never admin).
+    // Off by default; enable it only on demo deployments.
+    'demo_login' => (bool) env('DEMO_LOGIN', false),
+
     // Admin demo login; when unset a random password is generated (nobody can sign in).
     'admin_password' => env('ADMIN_PASSWORD'),
 

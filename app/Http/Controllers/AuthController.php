@@ -40,6 +40,30 @@ class AuthController extends Controller
             ->with('status', 'Welcome back, '.explode(' ', $user->name)[0].'!');
     }
 
+    /**
+     * One-click sign-in as a seeded demo user. Only for demo deployments (DEMO_LOGIN=true),
+     * and only for the attendee and organizer demo accounts, never admin.
+     */
+    public function demo(Request $request, string $role): RedirectResponse
+    {
+        abort_unless(config('eventpass.demo_login'), 404);
+
+        $email = match ($role) {
+            Role::Attendee->value => 'attendee@eventpass.test',
+            Role::Organizer->value => 'organizer@eventpass.test',
+            default => null,
+        };
+
+        $user = $email ? User::query()->where('email', $email)->first() : null;
+        abort_unless($user !== null, 404);
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->to($this->homeFor($user))
+            ->with('status', 'Signed in to the demo as '.$user->name.'.');
+    }
+
     public function showRegister()
     {
         return view('auth.register');

@@ -44,6 +44,8 @@ services:
       # Idempotent demo accounts and events so the live site is never empty.
       - key: SEED_DEMO
         value: "true"
+      - key: DEMO_LOGIN
+        value: "true" # one-click attendee/organizer demo sign-in on the login page (never admin)
       - key: DEMO_PASSWORD
         value: eventpass-demo # public on purpose: these accounts only exist for the demo
       - key: ADMIN_PASSWORD

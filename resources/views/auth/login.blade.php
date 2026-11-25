@@ -22,10 +22,29 @@
         </button>
     </form>
 
-    @if (app()->environment('local') === false)
-        <div class="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs leading-relaxed text-ink-300">
-            <p class="font-semibold text-ink-100">Demo accounts</p>
-            <p class="mt-1">Organizer: <code class="text-brand-300">organizer@eventpass.test</code> · Attendee: <code class="text-brand-300">attendee@eventpass.test</code><br>Password: <code class="text-brand-300">{{ config('eventpass.demo_password') }}</code></p>
+    @if (config('eventpass.demo_login'))
+        <div class="mt-8" x-data="{ busy: null }">
+            <div class="flex items-center gap-4 text-xs font-semibold tracking-wider text-ink-400 uppercase">
+                <span class="h-px flex-1 bg-white/10"></span> Or try the demo <span class="h-px flex-1 bg-white/10"></span>
+            </div>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                @foreach ([
+                    'attendee' => ['ticket', 'Demo attendee', 'Browse, book and pay'],
+                    'organizer' => ['calendar', 'Demo organizer', 'Events, sales and scanner'],
+                ] as $role => [$icon, $label, $hint])
+                    <form method="POST" action="{{ route('login.demo', $role) }}" @submit="busy = '{{ $role }}'">
+                        @csrf
+                        <button class="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-brand-400/50 hover:bg-brand-500/10 active:scale-[0.98] disabled:opacity-60" :disabled="busy !== null">
+                            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-linear-to-br from-brand-500/30 to-flame/20 text-brand-300 ring-1 ring-white/10 transition group-hover:scale-105"><x-icon :name="$icon" class="size-5" /></span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-white" x-text="busy === '{{ $role }}' ? 'Signing in…' : '{{ $label }}'">{{ $label }}</span>
+                                <span class="block truncate text-xs text-ink-300">{{ $hint }}</span>
+                            </span>
+                        </button>
+                    </form>
+                @endforeach
+            </div>
+            <p class="mt-3 text-center text-xs text-ink-400">One click, no password. Payments are test mode.</p>
         </div>
     @endif
 

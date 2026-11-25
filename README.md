@@ -11,6 +11,8 @@
 **Live demo:** https://eventpass-36j5.onrender.com
 (free tier: the first request after idle can take ~50 s to wake up)
 
+On the login page, click **Demo attendee** or **Demo organizer** for one-click access, or sign in manually:
+
 | Role | Email | Password |
 |---|---|---|
 | Attendee | `attendee@eventpass.test` | `eventpass-demo` |
