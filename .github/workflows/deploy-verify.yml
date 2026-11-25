@@ -1,0 +1,48 @@
+name: Verify deployment
+
+# Render deploys a commit only after CI checks pass (autoDeployTrigger: checksPass).
+# This workflow runs after a successful CI on main and proves the new release is live:
+# it polls /health until the reported version equals the commit SHA.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  SITE_URL: https://eventpass-36j5.onrender.com
+
+jobs:
+  verify:
+    name: Wait for release and check health
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Poll /health for the new version
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          echo "Waiting for $SITE_URL to serve $SHA"
+          for i in $(seq 1 60); do
+            body=$(curl -fsS --max-time 60 "$SITE_URL/health" || true)
+            echo "[$i] $body"
+            if echo "$body" | grep -q "\"version\":\"$SHA\"" && echo "$body" | grep -q '"status":"ok"'; then
+              echo "Release $SHA is live and healthy."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Release $SHA did not become healthy in time. Render keeps the previous version serving if a deploy fails its health check; roll back from the Render dashboard if needed."
+          exit 1
+
+      - name: Smoke test key pages
+        run: |
+          for path in / /events /login /up; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$SITE_URL$path")
+            echo "$code $path"
+            [ "$code" = "200" ] || exit 1
+          done

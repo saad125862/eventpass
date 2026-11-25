@@ -1,0 +1,11 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+    level: 5
+    treatPhpDocTypesAsCertain: false
+    # Lets Larastan infer column types (dates, casts, enums) from the schema.
+    databaseMigrationsPath:
+        - database/migrations

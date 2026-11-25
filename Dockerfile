@@ -18,6 +18,15 @@ COPY vite.config.js ./
 COPY public ./public
 RUN npm run build
 
+# ---- 2b. Dev image (used by docker-compose only; never the default build target) ----
+FROM dunglas/frankenphp:1-php8.4-alpine AS dev
+RUN install-php-extensions pdo_pgsql opcache bcmath pcntl gd zip pcov \
+    && apk add --no-cache git unzip
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+WORKDIR /app
+EXPOSE 8000
+CMD ["frankenphp", "php-server", "--root", "public", "--listen", ":8000"]
+
 # ---- 3. Runtime: FrankenPHP (Caddy + PHP in one binary, no nginx/php-fpm to configure) ----
 FROM dunglas/frankenphp:1-php8.4-alpine AS runtime
 
@@ -33,7 +42,8 @@ COPY --from=assets /app/public/build /app/public/build
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint
 
-ARG APP_VERSION=dev
+# Empty by default so Render's RENDER_GIT_COMMIT can supply the version at runtime.
+ARG APP_VERSION=""
 ENV APP_NAME=EventPass \
     APP_ENV=production \
     APP_DEBUG=false \

@@ -1,0 +1,47 @@
+# Local development stack. Nothing needs to be installed on the host except Docker.
+#   docker compose up -d                       # app on http://localhost:8000 + Postgres
+#   docker compose run --rm app php artisan test
+#   docker compose run --rm app composer install
+services:
+  app:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      # Only what differs from .env. Session/cache/queue drivers come from .env (database),
+      # which keeps `php artisan test` identical to CI (PHPUnit sets array/sync drivers itself).
+      APP_NAME: EventPass
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: eventpass
+      DB_USERNAME: eventpass
+      DB_PASSWORD: eventpass
+      DB_URL: ""
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: eventpass
+      POSTGRES_PASSWORD: eventpass
+      POSTGRES_DB: eventpass
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventpass -d eventpass"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

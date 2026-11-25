@@ -1,10 +1,11 @@
-# Render Blueprint: one free Docker web service. Database lives on Neon (free Postgres).
+# Render Blueprint: one free Docker web service. The database lives on Neon (free Postgres).
 services:
   - type: web
     name: eventpass
     runtime: docker
     plan: free
-    autoDeployTrigger: commit
+    # Deploy a commit only after its GitHub Actions checks have passed.
+    autoDeployTrigger: checksPass
     healthCheckPath: /health
     envVars:
       - key: APP_NAME
@@ -14,9 +15,9 @@ services:
       - key: APP_DEBUG
         value: "false"
       - key: APP_KEY
-        sync: false # generate with: docker run --rm composer:2 php -r "echo 'base64:'.base64_encode(random_bytes(32));"
+        sync: false # generate with: "base64:" + [Convert]::ToBase64String((1..32 | % { Get-Random -Max 256 }) -as [byte[]])
       - key: APP_URL
-        sync: false # e.g. https://eventpass.onrender.com
+        sync: false # e.g. https://eventpass-xxxx.onrender.com
       - key: LOG_CHANNEL
         value: stderr
       - key: DB_CONNECTION
@@ -31,5 +32,19 @@ services:
         value: database
       - key: QUEUE_CONNECTION
         value: database
+      - key: MAIL_MAILER
+        value: log # switch to smtp and set MAIL_HOST/PORT/USERNAME/PASSWORD for real delivery
+      # The single free container also runs its own queue worker and scheduler.
       - key: RUN_MIGRATIONS
         value: "true"
+      - key: RUN_WORKER
+        value: "true"
+      - key: RUN_SCHEDULER
+        value: "true"
+      # Idempotent demo accounts and events so the live site is never empty.
+      - key: SEED_DEMO
+        value: "true"
+      - key: DEMO_PASSWORD
+        value: eventpass-demo # public on purpose: these accounts only exist for the demo
+      - key: ADMIN_PASSWORD
+        generateValue: true # random; read it in the Render dashboard if you need the admin login
