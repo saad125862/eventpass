@@ -9,7 +9,7 @@ COPY . .
 RUN composer dump-autoload --no-dev --optimize --no-interaction --ignore-platform-reqs
 
 # ---- 2. Frontend assets (Vite) ----
-FROM node:22-alpine AS assets
+FROM node:26-alpine AS assets
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
