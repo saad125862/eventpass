@@ -123,7 +123,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Vulnerability scan (Trivy, critical and fixable only)
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: eventpass:ci
           severity: CRITICAL
