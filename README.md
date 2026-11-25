@@ -1,58 +1,109 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# EventPass
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+[![CI](https://github.com/saad125862/eventpass/actions/workflows/ci.yml/badge.svg)](https://github.com/saad125862/eventpass/actions/workflows/ci.yml)
+[![Verify deployment](https://github.com/saad125862/eventpass/actions/workflows/deploy-verify.yml/badge.svg)](https://github.com/saad125862/eventpass/actions/workflows/deploy-verify.yml)
+![Laravel 13](https://img.shields.io/badge/Laravel-13-ff2d20?logo=laravel&logoColor=white)
+![PHP 8.4](https://img.shields.io/badge/PHP-8.4-777bb4?logo=php&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ed?logo=docker&logoColor=white)
 
-## About Laravel
+**Event ticketing with concurrency-safe booking, instant QR passes and a live check-in scanner**, deployed through a fully automated CI/CD pipeline on free-tier infrastructure.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+**Live demo:** https://eventpass-36j5.onrender.com
+(free tier: the first request after idle can take ~50 s to wake up)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Role | Email | Password |
+|---|---|---|
+| Attendee | `attendee@eventpass.test` | `eventpass-demo` |
+| Organizer | `organizer@eventpass.test` | `eventpass-demo` |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Payments run in **test mode**. Use card `4242 4242 4242 4242` (any future date and CVC) to succeed, or `4000 0000 0000 0002` to see a decline. No real money moves.
 
-## Learning Laravel
+## What it does
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Attendees** browse and filter events, pick ticket tiers, hold seats for 10 minutes, pay, and get QR tickets instantly (on screen, as a PDF, and by email).
+- **Organizers** create events with multiple ticket tiers, publish them, watch sales on a dashboard, export attendees as CSV, and **scan tickets at the door with a phone camera**.
+- **Admins** manage roles and moderate events.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## The interesting engineering
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+| Problem | Solution |
+|---|---|
+| Two people buy the last ticket | Bookings run in a DB transaction that **locks the ticket-type rows** (`SELECT ... FOR UPDATE`, in id order) before counting stock. A CI test launches **50 parallel processes against PostgreSQL for 10 tickets and asserts exactly 10 succeed.** |
+| Double clicks / retries | **Idempotency keys** (unique per user) return the same order; webhook and payment confirmation are idempotent too. |
+| Abandoned carts hogging stock | Pending orders hold seats for 10 minutes. Capacity is computed from *paid + unexpired holds*, so seats free up the instant a hold lapses, even before the scheduler runs. |
+| Client-side price tampering | Prices and totals are always read from the database. |
+| A ticket scanned twice | Check-in is one atomic `UPDATE ... WHERE status = 'valid'`; only one scan can win, even from two phones at once. |
+| Forged payment callbacks | `/webhooks/payments` requires an **HMAC-SHA256 signature** and uses constant-time comparison. |
+| CSV injection | Exported cells starting with `= + - @` are neutralised. |
 
-## Agentic Development
+## Architecture
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```mermaid
+flowchart LR
+    U[Browser] -->|HTTPS| R[Render<br/>FrankenPHP container]
+    R -->|PDO pgsql + SSL| N[(Neon Postgres)]
+    R --- W[Queue worker<br/>+ scheduler loops]
+    GH[GitHub] -->|push| CI[GitHub Actions]
+    CI -->|checks pass| R
+    CI -->|image| G[GHCR]
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+A single free Render container runs the web server, a queue worker (emails) and a scheduler (releases expired holds, sends reminders), because the free tier has no background workers or cron. State lives in Neon.
 
-## Contributing
+## CI/CD pipeline
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```
+push / PR
+  ├─ quality      Pint · Larastan · composer audit · tests with a 80% coverage gate
+  ├─ concurrency  full suite on a PostgreSQL service (50 racing buyers)
+  ├─ docker       build · Trivy scan · smoke test with ALL Linux capabilities dropped
+  └─ publish      immutable :sha + :latest image to GHCR            (main only)
 
-## Code of Conduct
+Render deploys the commit ONLY after the checks above pass (autoDeployTrigger: checksPass)
+  └─ deploy-verify  polls /health until the live version == the commit SHA, then smoke-tests pages
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- **Zero-downtime and safe:** Render keeps the previous release serving until the new one passes `/health`, and migrations run on boot of the new instance.
+- **Traceable:** `/health` reports the deployed commit SHA.
+- **Rollback:** redeploy a previous commit from the Render dashboard (or pull a previous `:sha` image from GHCR).
+- **Supply chain:** Dependabot (composer, npm, Actions, Docker), `composer audit`, Trivy.
 
-## Security Vulnerabilities
+## Run it locally (only Docker is required)
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```powershell
+docker compose up -d                                  # app on http://localhost:8000 + Postgres
+docker compose run --rm app composer install
+docker compose run --rm app php artisan migrate
+docker compose run --rm app php artisan eventpass:seed-demo   # demo accounts, events and sales
+npm install; npm run build                            # frontend assets
+```
 
-## License
+Tests:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```powershell
+# fast (in-memory SQLite)
+docker compose run --rm -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan test
+# full, including the concurrency test (needs a separate DB so dev data is untouched)
+docker compose exec db psql -U eventpass -d postgres -c "create database eventpass_test"
+docker compose run --rm -e DB_DATABASE=eventpass_test app php artisan test
+```
+
+## Deploy your own (all free)
+
+1. **Neon:** create a project and copy the connection string.
+2. **Render:** *New → Blueprint* and pick this repo. Fill in `APP_KEY`, `APP_URL` and `DB_URL`.
+3. Optional: UptimeRobot on `/health` keeps the free instance warm; set `MAIL_MAILER=smtp` (and `MAIL_*`) for real email.
+
+## Stack
+
+Laravel 13 · PHP 8.4 · PostgreSQL 17 · Tailwind CSS 4 · Alpine.js · Motion · FrankenPHP · Docker · GitHub Actions · Render · Neon · bacon-qr-code · dompdf
+
+## Project layout
+
+```
+app/Services      BookingService (locking), PaymentService, CheckInService, QrCodeService
+app/Http          controllers (public, organizer, admin), role middleware, security headers
+tests/Feature     auth, roles, booking, payments, tickets, check-in, concurrency
+.github           CI, deploy verification, Dependabot
+docker/, Dockerfile, docker-compose.yml, render.yaml
+```
